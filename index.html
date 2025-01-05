@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<!-- 
+
+   Copyright 2025 Balázs Zaicsek
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+-->
+<html>
+    <head>
+        <title>Interest calculator</title>
+        <style>
+            table, th, td {
+                border: 1px solid black;
+                border-collapse: collapse;
+                padding: 10px;
+            }
+            .goldenYear {
+                background-color: LightYellow;
+            }
+        </style>
+        <script>
+            class Account {
+                constructor(salary, previousDeposit, previousInterest, deposit, inflation) {
+                    this.salary=salary;
+                    this.previousDeposit=previousDeposit;
+                    this.previousInterest=previousInterest;
+                    this.deposit=deposit;
+                    this.inflation=inflation;
+                }
+                
+                sumMoney() {
+                    return this.previousDeposit+this.previousInterest;
+                }
+                
+            }
+        
+            function calculateInterests() {
+                const display = document.getElementById("display");
+                display.innerHTML="";
+                //console.log("display: %o", display);
+                //console.log("done");
+                const salary = parseInt(document.getElementById('salary').value);
+                const baseInterst = parseFloat(document.getElementById('interest').value);
+                const rate = (100.0 + baseInterst)/100.0;
+                const baseInflation = parseFloat(document.getElementById('inflation').value);
+                const inflationRate = (100.0-baseInflation)/100.0;
+                const formatId = document.getElementById('format').value;
+                const currencyId = document.getElementById('currency').value;
+                const allAccounts = [];
+                let account = new Account(
+                    salary, 
+                    parseInt(document.getElementById('start').value),
+                    0,
+                    parseInt(document.getElementById('deposit').value),
+                    1.0
+                    );
+                for(let i=0; i<parseInt(document.getElementById('years').value); ++i) {
+                    allAccounts.push(account);
+                    account = addYear(i, account, rate, inflationRate, formatId, currencyId, display);
+                    //console.log(account);
+                }
+                //console.log("all: %o", allAccounts);
+                addTable(allAccounts, display, true);
+            }
+            
+            function addYear(year, account, rate, inflation, formatId, currencyId, extend) {
+                const formatter = new Intl.NumberFormat(formatId, { style: 'currency', currency: currencyId});
+                const percentFormatter = new Intl.NumberFormat(formatId, { maximumFractionDigits: 2});
+                const p = document.createElement("p");
+                const sum = account.sumMoney();
+                const withInterest = sum * rate;
+                const depositIncreaseRate = isFollowInflation()?1.0+(1.0-inflation):1.0;
+                const newSalary = account.salary * depositIncreaseRate;
+                const depositedPercent = account.previousDeposit * 100.0 / sum;
+                const interestPercent = account.previousInterest * 100.0 / sum;
+                const usablePercent = (rate-1.0) - (1.0-inflation);
+                const consumptionPlan = getComsumptionPlan();
+                const monthlyUsable = consumptionPlan.consume?((sum*usablePercent/consumptionPlan.time)/12.0 + (sum/consumptionPlan.time/12.0)):sum*usablePercent/12;
+                const monthlyUsableCurrentValue = monthlyUsable*account.inflation;
+                if(monthlyUsableCurrentValue >= getBaseMonthlyUsable()) {
+                    //console.log("sum*usablePercent == %o * %o = %o", sum, usablePercent, (sum*usablePercent));
+                    //console.log("salary - deposit == %o - %o = %o", account.salary, account.deposit, (account.salary-account.deposit));
+                    account.goldenYear=true;
+                } else {
+                    account.goldenYear=false;
+                }
+                account.strs = {}
+                account.strs.sum = formatter.format(account.sumMoney());
+                account.strs.deposited = formatter.format(account.previousDeposit);
+                account.strs.interest = formatter.format(account.previousInterest);
+                account.strs.depoPerc = percentFormatter.format(depositedPercent)+"%";
+                account.strs.intrPerc = percentFormatter.format(interestPercent)+"%";
+                account.strs.monthlyDeposit = formatter.format(account.deposit/12.0);
+                account.strs.currentValue = formatter.format(sum*account.inflation);
+                account.strs.monthlyUsable = formatter.format(monthlyUsable);
+                account.strs.monthlyUsableCurrentValue = formatter.format(monthlyUsableCurrentValue);
+                //console.log(usablePercent);
+                //console.log((year+1)+" sum: "+sum+" * "+rate+" = "+withInterest);
+                /*
+                p.innerHTML=(year+1)+" sum: "+account.strs.sum
+                    +" deposited: "+account.strs.deposited
+                    +" interest: "+account.strs.interest
+                    +" ("+account.strs.depoPerc+" / "+account.strs.intrPerc+"%)"
+                    +" monthly deposit: "+account.strs.monthlyDeposit
+                    +" ,this worth: "+account.strs.currentValue
+                    +" monthly usable: "+account.strs.monthlyUsable+" (which worth: "+ account.strs.monthlyUsableCurrentValue+")";
+                extend.insertBefore(p, extend.firstChild);
+                */
+                return new Account(newSalary, account.previousDeposit+account.deposit, withInterest-account.previousDeposit, account.deposit*depositIncreaseRate, account.inflation*inflation);
+            }
+            
+            function addTable(all, extend, reverse=false) {
+                const table = addElem("table", '', extend, true);
+                const headerLine = addElem('tr', '', table, true);
+                for(const title of ['year', 'sum', 'deposit', 'interest', 'deposited %', 'interest %', 'monthly deposit', 'current value', 'monthly usable', 'monthly usable current value']) {
+                    addElem('td', title, headerLine, false);
+                }
+                const allCpy = all.slice()
+                if(reverse) {
+                    allCpy.reverse();
+                }
+                let num = reverse?all.length:1;
+                for(const acc of allCpy) {
+                    const tr = addElem('tr', '', table, false);
+                    addElem('td', num, tr, false);
+                    addElem('td', acc.strs.sum, tr, false);
+                    addElem('td', acc.strs.deposited, tr, false);
+                    addElem('td', acc.strs.interest, tr, false);
+                    addElem('td', acc.strs.depoPerc, tr, false);
+                    addElem('td', acc.strs.intrPerc, tr, false);
+                    addElem('td', acc.strs.monthlyDeposit, tr, false);
+                    addElem('td', acc.strs.currentValue, tr, false);
+                    addElem('td', acc.strs.monthlyUsable, tr, false);
+                    addElem('td', acc.strs.monthlyUsableCurrentValue, tr, false);
+                    if(reverse) {
+                        --num;
+                    } else {
+                        ++num;
+                    }
+                    if(acc.goldenYear) {
+                        tr.classList.add("goldenYear");
+                    }
+                } 
+            }
+            
+            function addElem(type, content, parent, first=false) {
+                const element = document.createElement(type);
+                element.innerHTML=content;
+                if(parent !== 'undefined') {
+                    if(first) {
+                        parent.insertBefore(element, parent.firstChild);
+                    } else {
+                        parent.appendChild(element);
+                    }
+                }
+                return element;
+            }
+            function updateDisplays() {
+                displayMonthly('salary', 'monthlySalary');
+                displayMonthly('deposit', 'monthlyDeposit');
+                updateConsumption();
+            }
+            function isFollowInflation() {
+                const follow = document.getElementById("follow")
+                return follow.checked
+            }
+            function displayMonthly(inputId, outputId) {
+                const value = parseFloat(document.getElementById(inputId).value);
+                displayMoneyTo(value/12.0, outputId);
+                updateMonthlyUsable();
+            }
+            function getBaseMonthlyUsable() {
+                const salary = parseFloat(document.getElementById("salary").value)
+                const deposit = parseFloat(document.getElementById("deposit").value)
+                return (salary-deposit)/12.0;
+            }
+            function displayMoneyTo(value, outputId) {
+                const formatId = document.getElementById('format').value;
+                const currencyId = document.getElementById('currency').value;
+                const formatter = new Intl.NumberFormat(formatId, { style: 'currency', currency: currencyId});
+                const target = document.getElementById(outputId);
+                target.innerHTML="monthly: "+formatter.format(value)
+            }
+            function updateMonthlyUsable() {
+                const salary = parseFloat(document.getElementById("salary").value)
+                const deposit = parseFloat(document.getElementById("deposit").value)
+                const value = (salary-deposit)/12.0;
+                displayMoneyTo(getBaseMonthlyUsable(), 'monthlyUsable');
+            }
+            function updateConsumption() {
+                const neverConsume = document.getElementById('consumeNever');
+                const consumeYears = document.getElementById('consumeYears');
+                if(consumeNever.checked) {
+                    consumeYears.disabled=true;
+                } else {
+                    consumeYears.disabled=false;
+                }
+            }
+            function getComsumptionPlan() {
+                const neverConsume = document.getElementById('consumeNever');
+                const consumeYears = document.getElementById('consumeYears');
+                if(consumeNever.checked) {
+                    return {consume: false, time: 10000};
+                } else {
+                    return {consume: true, time: (consumeYears.value ? parseInt(consumeYears.value) : 10000)};
+                }
+            }
+            
+        </script>
+    </head>
+    <body>
+        format: <select name='format' id='format' onchange="updateDisplays()">
+                    <option value='hu-HU' selected='selected'>Hungarian</option>
+                    <option value='en-US'>USA</option>
+                    <option value='en-GB'>British</option>
+                    <option value='de-DE'>German</option>
+                </select> 
+        currency: <select name='currency' id='currency' onchange="updateDisplays()">
+                        <option value='HUF' selected='selected'>HUF</option>
+                        <option value='GBP'>GBP</option>
+                        <option value='USD'>USD</option>
+                        <option value='EUR'>EUR</option>
+                  </select> <br />
+        start: <input type="number" name="start" id="start" value='200000' /> <br />
+        interest: <input type="number" name="interest" id="interest" value='7' step="0.1"/> <br />
+        yearly salary: <input type="number" name="salary" id="salary" value='6000000' onkeyup="displayMonthly('salary', 'monthlySalary')" /> <span id="monthlySalary"></span><br />
+        yearly deposit: <input type="number" name="deposit" id="deposit" value='300000' onkeyup="displayMonthly('deposit', 'monthlyDeposit')"/> <span id="monthlyDeposit"></span><br />
+        usable: <span id="monthlyUsable"></span> <br />
+        yearly inflation: <input type="number" name="inflation" id="inflation" value='3.5' step='0.1' /> <br />
+        years: <input type="number" name="years" id="years" value='20' /> <br />
+        consume: Never <input type="radio" name="consume" value="never" id="consumeNever" onchange="updateDisplays()" checked>, in Years: <input type="radio" name="consume" value="never" id="consumeInYears" onchange="updateDisplays()"> years to consume: <input type="number" value="20" id="consumeYears" name="consumeYears" /> <br />
+        follow inflation with deposit: <input type="checkbox" name="follow" id="follow" checked> <br />
+        <button onclick="calculateInterests()">calculate</button>
+        <div id="display">
+        </div>
+        <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            updateDisplays();
+        });
+        </script>
+    </body>
+</html>
