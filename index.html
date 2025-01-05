@@ -94,7 +94,9 @@
                 const usablePercent = (rate-1.0) - (1.0-inflation);
                 const consumptionPlan = getComsumptionPlan();
                 //const monthlyUsable = consumptionPlan.consume?((sum*usablePercent/consumptionPlan.time)/12.0 + (sum/consumptionPlan.time/12.0)):sum*usablePercent/12;
-                const monthlyUsable = consumptionPlan.consume?(sum*usablePercent/12.0 + (sum/consumptionPlan.time/12.0)):sum*usablePercent/12;
+                //const monthlyUsable = consumptionPlan.consume?((sum-sum/consumptionPlan.time)*usablePercent/12.0 + (sum/consumptionPlan.time/12.0)):sum*usablePercent/12;
+                const r = calculateAdjustedInterestRate();
+                const monthlyUsable = consumptionPlan.consume?((sum*r)/(1-((1+r)**-consumptionPlan.time))/12.0):(sum*usablePercent/12);
                 const monthlyUsableCurrentValue = monthlyUsable*account.inflation;
                 if(monthlyUsableCurrentValue >= getBaseMonthlyUsable()) {
                     //console.log("sum*usablePercent == %o * %o = %o", sum, usablePercent, (sum*usablePercent));
@@ -223,6 +225,14 @@
                 } else {
                     return {consume: true, time: (consumeYears.value ? parseInt(consumeYears.value) : 10000)};
                 }
+            }
+            function calculateAdjustedInterestRate() {
+                const baseInterst = parseFloat(document.getElementById('interest').value);
+                const interestRate = (100.0 + baseInterst)/100.0;
+                const baseInflation = parseFloat(document.getElementById('inflation').value);
+                const inflationRate = (100.0+baseInflation)/100.0;
+                const r = (interestRate / inflationRate)-1.0;
+                return r;
             }
             
         </script>
