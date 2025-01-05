@@ -30,6 +30,9 @@
             }
         </style>
         <script>
+            window.addEventListener('scroll', function(event) {
+                event.preventDefault();
+            });
             class Account {
                 constructor(salary, previousDeposit, previousInterest, deposit, inflation) {
                     this.salary=salary;
