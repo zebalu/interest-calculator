@@ -33,6 +33,10 @@
             window.addEventListener('scroll', function(event) {
                 event.preventDefault();
             });
+            window.addEventListener('beforeunload', function(event) {
+                event.preventDefault();
+                event.returnValue = '';
+            });
             class Account {
                 constructor(salary, previousDeposit, previousInterest, deposit, inflation) {
                     this.salary=salary;
